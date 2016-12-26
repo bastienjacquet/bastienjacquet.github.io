@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<!-- paulirish.com/2008/conditional-stylesheets-vs-css-hacks-answer-neither/ -->
+<!-- Consider specifying the language of your content by adding the `lang` attribute to <html> -->
+<!--[if lt IE 7]> <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>    <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>    <html class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]><!-->
+<html class="no-js">
+	<!--<![endif]-->
+	<head>
+		<meta charset="utf-8">
+
+		<!-- Use the .htaccess and remove these lines to avoid edge case issues.
+		More info: h5bp.com/i/378 -->
+		<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+
+		<title></title>
+		<meta name="description" content="">
+
+		<!-- Mobile viewport optimized: h5bp.com/viewport -->
+		<meta name="viewport" content="width=device-width">
+
+		<!-- Place favicon.ico and apple-touch-icon.png in the root directory: mathiasbynens.be/notes/touch-icons -->
+
+		<link rel="stylesheet" href="css/main.css">
+
+		<!-- More ideas for your <head> here: h5bp.com/d/head-Tips -->
+
+		<!-- All JavaScript at the bottom, except this Modernizr build.
+		Modernizr enables HTML5 elements & feature detects for optimal performance.
+		Create your own custom Modernizr build: www.modernizr.com/download/ -->
+		<script src="js/vendor/modernizr-2.6.1.min.js"></script>
+	</head>
+	<body>
+		<!-- Prompt IE 6 users to install Chrome Frame. Remove this if you support IE 6.
+		chromium.org/developers/how-tos/chrome-frame-getting-started -->
+		<!--[if lt IE 7]><p class="chromeframe">Your browser is <em>ancient!</em> <a href="http://browsehappy.com/">Upgrade to a different browser</a> or <a href="http://www.google.com/chromeframe/?redirect=true">install Google Chrome Frame</a> to experience this site.</p><![endif]-->
+
+		<!-- Add your site or application content here -->
+		<script src="js/data.js"></script>
+		<script src="js/parameters.js"></script>
+		<div id="container">
+			<canvas id="c" width="1200" height="1200"></canvas>
+			<script>
+				var canvas = document.getElementById("c"), context = canvas.getContext("2d");
+
+				CanvasRenderingContext2D.prototype.fillCurvedText = function(text, x, y, radius, startRotation, generation) {
+					var maximumAngularSpace = param.angle / (Math.pow(2, generation));
+					var spaceLength = maximumAngularSpace * radius;
+					//1 letter every letterDensity pixel
+					var maxLetter = spaceLength / param.letterDensity;
+					var numDegreesPerLetter = maximumAngularSpace / maxLetter;
+					var centerPoint = startRotation - maximumAngularSpace / 2;
+					var startAngle = centerPoint - (maximumAngularSpace * Math.min(maxLetter, text.length) / maxLetter) / 2;
+					this.save();
+					this.translate(x, y);
+					this.rotate(startAngle);
+					//var words = text.split(' ');
+					/*for (var n = 0; n < words.length; n++) {
+					 this.save();
+					 this.translate(radius, 0);
+					 this.rotate(Math.PI / 2 + words[n].length*0.014*Math.PI);
+					 this.fillText(words[n], 0, 0);
+					 this.restore();
+					 this.rotate(numDegreesPerLetter*(words[n].length+1));
+					 }*/
+					for (var i = 0; i < Math.min(text.length, maxLetter); i++) {
+						this.save();
+						this.translate(radius, 0);
+						this.rotate(Math.PI / 2)
+						this.fillText(text[i], 0, 0);
+						this.restore();
+						this.rotate(numDegreesPerLetter);
+					}
+					this.restore();
+				}
+				CanvasRenderingContext2D.prototype.fillRadialText = function(text, x, y, radius, startRotation, radiusMax) {
+					var spaceLength = radiusMax - radius - param.letterDensity;
+					//letterDensity for offset
+					//1 letter every letterDensity pixel
+					var maxLetter = spaceLength / param.letterDensity;
+					this.save();
+					this.translate(x, y);
+					this.rotate(startRotation);
+
+					this.save();
+					this.translate(radius + param.letterDensity / 2, 0);
+					this.fillText(text.substring(0, Math.min(maxLetter + 1, text.length + 1)), 0, 0);
+					this.restore();
+
+					//var words = text.split(' ');
+					/*for (var n = 0; n < words.length; n++) {
+					 this.save();
+					 this.translate(radius, 0);
+					 this.rotate(Math.PI / 2 + words[n].length*0.014*Math.PI);
+					 this.fillText(words[n], 0, 0);
+					 this.restore();
+					 this.rotate(numDegreesPerLetter*(words[n].length+1));
+					 for (var i = 0; i < Math.min(text.length, maxLetter); i++) {
+					 this.save();
+					 this.translate(radius, 0);
+					 this.rotate(Math.PI / 2)
+					 this.fillText(text[i], 0, 0);
+					 this.restore();
+					 this.rotate(numDegreesPerLetter);
+					 }
+					 }*/
+					this.restore();
+				}
+				var x = canvas.width / 2;
+				var y = canvas.height / 2;
+
+				for (var generation = 1; generation < data.ancestors.length + 1; generation++) {
+					var l = data.ancestors[generation - 1].length;
+					if (generation < param.expandStart) {
+						for (var i = 0; i < l; i++) {
+							var angleIndex = l - i - 1;
+							var color = [param.colors[generation % param.colors.length][0], param.colors[generation % param.colors.length][1], param.colors[generation % param.colors.length][2]];
+							if (i % 2 == 1) {
+								color[0] = Math.round(Math.min(color[0] * 1.1, 255));
+								color[1] = Math.round(Math.min(color[1] * 1.1, 255));
+								color[2] = Math.round(Math.min(color[2] * 1.1, 255));
+							}
+							context.fillStyle = "rgb(" + color[0] + "," + color[1] + "," + color[2] + ")";
+							context.beginPath();
+							context.arc(x, y, param.centerSize + param.radius * generation, (angleIndex + 1) * param.angle / l, angleIndex * param.angle / l, true);
+							context.arc(x, y, param.centerSize + param.radius * (generation - 1), angleIndex * param.angle / l, (angleIndex + 1) * param.angle / l, false);
+							context.closePath();
+							context.stroke();
+							context.fill();
+							context.fillStyle = '#000';
+							context.font = param.nameFont;
+							context.fillCurvedText(data.ancestors[generation-1][i].name, x, y, param.centerSize + param.radius * (generation - 0.5) + 5 * param.scale, (angleIndex + 1) * param.angle / l, generation);
+							context.font = param.fnameFont;
+							context.fillCurvedText(data.ancestors[generation-1][i].fname, x, y, param.centerSize + param.radius * (generation - 0.5) - 10 * param.scale, (angleIndex + 1) * param.angle / l, generation);
+						}
+					} else {
+						context.fillStyle = '#DDD';
+						for (var i = 0; i < l; i++) {
+							var angleIndex = l - i - 1;
+							var color = [param.colors[generation % param.colors.length][0], param.colors[generation % param.colors.length][1], param.colors[generation % param.colors.length][2]];
+							if (i % 2 == 1) {
+								color[0] = Math.round(Math.min(color[0] * 1.1, 255));
+								color[1] = Math.round(Math.min(color[1] * 1.1, 255));
+								color[2] = Math.round(Math.min(color[2] * 1.1, 255));
+							}
+							context.fillStyle = "rgb(" + color[0] + "," + color[1] + "," + color[2] + ")";
+							context.beginPath();
+							context.arc(x, y, param.centerSize + param.radius * (param.expandStart - 1) + param.radiusRadial * (generation - (param.expandStart - 1)), (angleIndex + 1) * param.angle / l, angleIndex * param.angle / l, true);
+							context.arc(x, y, param.centerSize + param.radius * (param.expandStart - 1) + param.radiusRadial * (generation - param.expandStart), angleIndex * param.angle / l, (angleIndex + 1) * param.angle / l, false);
+							context.closePath();
+							context.stroke();
+							context.fill();
+							context.fillStyle = '#000';
+							if (generation < param.oneLineNameStart) {
+								context.font = param.nameFont;
+								context.fillRadialText(data.ancestors[generation-1][i].name, x, y, param.centerSize + param.radius * (param.expandStart - 1) + param.radiusRadial * (generation - param.expandStart), (angleIndex + 0.5) * param.angle / l - 0.01 * param.scale, param.centerSize + param.radius * (param.expandStart - 1) + param.radiusRadial * (generation - (param.expandStart - 1)));
+								context.font = param.fnameFont;
+								context.fillRadialText(data.ancestors[generation-1][i].fname, x, y, param.centerSize + param.radius * (param.expandStart - 1) + param.radiusRadial * (generation - param.expandStart), (angleIndex + 0.5) * param.angle / l + 0.02 * param.scale, param.centerSize + param.radius * (param.expandStart - 1) + param.radiusRadial * (generation - (param.expandStart - 1)));
+							} else if (generation < param.stopDisplayName) {
+								context.font = param.fnameFont;
+								context.fillRadialText(data.ancestors[generation-1][i].name + ' ' + data.ancestors[generation-1][i].fname, x, y, param.centerSize + param.radius * (param.expandStart - 1) + param.radiusRadial * (generation - param.expandStart), (angleIndex + 0.5) * param.angle / l + 0.005 * param.scale, param.centerSize + param.radius * (param.expandStart - 1) + param.radiusRadial * (generation - (param.expandStart - 1)));
+							}
+						}
+					}
+				}
+
+				canvas.onclick = function() {
+					window.location = canvas.toDataURL('image/png');
+				};
+
+				/*var tempCanvas = document.createElement("canvas"), tempCtx = tempCanvas.getContext("2d");
+
+				tempCanvas.width = canvas.width;
+				tempCanvas.height = canvas.height;
+				tempCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height);
+				// Now clear the portion to rotate.
+				context.fillStyle = "#fff";
+				context.fillRect(0, 0, canvas.width, canvas.height);
+
+				context.save();
+				context.translate(canvas.width/2, canvas.height/2);
+				// Translate (190/2 is half of the box we drew)
+				//context.translate(canvas.width, canvas.height/2);
+				// Scale
+				//ctx.scale(0.5, 0.5);
+				// Rotate it
+				context.rotate(param.angle);
+				context.translate(-canvas.width/2, -canvas.height/2);
+				// Finally draw the image data from the temp canvas.
+				context.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
+				context.restore();*/
+				
+
+			</script>
+		</div>
+
+		<!-- JavaScript at the bottom for fast page loading: http://developer.yahoo.com/performance/rules.html#js_bottom -->
+
+		<!-- Grab Google CDN's jQuery, with a protocol relative URL; fall back to local if offline -->
+		<!-- <script src="//ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>-->
+		<script>
+			window.jQuery || document.write('<script src="js/vendor/jquery-1.7.2.min.js"><\/script>')
+		</script>
+
+		<!-- scripts concatenated and minified via build script -->
+		<script src="js/plugins.js"></script>
+		<script src="js/main.js"></script>
+		<!-- end scripts -->
+
+		<!-- Asynchronous Google Analytics snippet. Change UA-XXXXX-X to be your site's ID.
+		mathiasbynens.be/notes/async-analytics-snippet -->
+		<!--<script>
+		var _gaq = [['_setAccount', 'UA-XXXXX-X'], ['_trackPageview']];
+		( function(d, t) {
+		var g = d.createElement(t), s = d.getElementsByTagName(t)[0];
+		g.src = ('https:' == location.protocol ? '//ssl' : '//www') + '.google-analytics.com/ga.js';
+		s.parentNode.insertBefore(g, s)
+		}(document, 'script'));
+		</script>-->
+	</body>
+</html>

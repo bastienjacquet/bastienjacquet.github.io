@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<!-- paulirish.com/2008/conditional-stylesheets-vs-css-hacks-answer-neither/ -->
+<!-- Consider specifying the language of your content by adding the `lang` attribute to <html> -->
+<!--[if lt IE 7]> <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>    <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>    <html class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]><!-->
+<html class="no-js">
+	<!--<![endif]-->
+	<head>
+		<meta charset="utf-8">
+
+		<!-- Use the .htaccess and remove these lines to avoid edge case issues.
+		More info: h5bp.com/i/378 -->
+		<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+
+		<title></title>
+		<meta name="description" content="">
+
+		<!-- Mobile viewport optimized: h5bp.com/viewport -->
+		<meta name="viewport" content="width=device-width">
+
+		<!-- Place favicon.ico and apple-touch-icon.png in the root directory: mathiasbynens.be/notes/touch-icons -->
+
+		<link rel="stylesheet" href="css/main.css">
+
+		<!-- More ideas for your <head> here: h5bp.com/d/head-Tips -->
+
+		<!-- All JavaScript at the bottom, except this Modernizr build.
+		Modernizr enables HTML5 elements & feature detects for optimal performance.
+		Create your own custom Modernizr build: www.modernizr.com/download/ -->
+		<script src="js/vendor/modernizr-2.6.1.min.js"></script>
+	</head>
+	<body>
+		<!-- Prompt IE 6 users to install Chrome Frame. Remove this if you support IE 6.
+		chromium.org/developers/how-tos/chrome-frame-getting-started -->
+		<!--[if lt IE 7]><p class="chromeframe">Your browser is <em>ancient!</em> <a href="http://browsehappy.com/">Upgrade to a different browser</a> or <a href="http://www.google.com/chromeframe/?redirect=true">install Google Chrome Frame</a> to experience this site.</p><![endif]-->
+
+		<!-- Add your site or application content here -->
+		<script src="js/data.js"></script>
+		<script src="js/parameters.js"></script>
+		<script src="http://d3js.org/d3.v2.js"></script>
+		<script src="js/vendor/jquery-1.7.2.min.js"></script>
+		<script src="js/jquery.svg.min.js"></script>
+		<script src="js/jquery.svgdom.min.js"></script>
+		<div id="container"></div>
+		<div id="details"></div>
+		Code:		<textarea id="code" value="Test"></textarea>
+		<script type="text/javascript">
+		    function encode_as_img_and_link(){
+                 // Add some critical information
+                 svg=$("svg")
+                    .attr({ version: '1.1' , xmlns:"http://www.w3.org/2000/svg"});
+                 xmlHeader='<?xml version="1.0" encoding="Latin1"?>';
+                 var b64 = btoa(xmlHeader+$("#svg").parent().html()); // or use btoa if supported
+
+                 // Works in recent Webkit(Chrome)
+                 $("body").append($("<img src='data:image/svg+xml;base64,\n"+b64+"' alt='file.svg'/>"));                    
+                 // Works in Firefox 3.6 and Webit and possibly any browser which supports the data-uri
+                 $("body").append($("<a href-lang='image/svg+xml' href='data:image/svg+xml;base64,\n"+b64+"' title='file.svg' download='file.svg'>Download</a>"));
+            }
+            setTimeout(encode_as_img_and_link,5000);
+			var w = param.width, //width
+			h = param.height;
+
+			var vis = d3.select("#container").append("svg:svg")//create the SVG element inside the <body>
+			.attr("width", w)//set the width and height of our visualization (these will be attributes of the <svg> tag
+			.attr("height", h)//
+			.attr("id", "svg")//
+			.style("border-width", "0px")
+			.append("svg:g")//make a group to hold our pie chart
+			.attr("transform", "translate(" + w / 2 + "," + h / 2 + ")")//move the center of the pie chart from 0, 0 to center or drawing area
+
+			//add center text
+			var centerText = vis.append("g")//
+			.attr("class", "text")//
+			.style("fill", "black");
+
+			centerText.append("text")//
+			.style("font-size", param.nameFontSize + "px")//
+			.style("font-weight", "bold")//
+			.attr("dy", -5).attr("text-anchor", "middle")//
+			.text(data.source.name.substring(0, Math.min((param.centerSize * 2 / 9) + 1, data.source.name.length + 1)));
+			centerText.append("text")//
+			.attr("dy", 15).style("font-size", param.fnameFontSize + "px")//
+			.attr("text-anchor", "middle")//
+			.text(data.source.fname.substring(0, Math.min((param.centerSize * 2 / 9) + 1, data.source.fname.length + 1)));
+
+			for(var generation = 1; generation < data.ancestors.length + 1; generation++) {
+				var l = data.ancestors[generation - 1].length;
+				if(generation < param.expandStart) {
+					for(var i = 0; i < l; i++) {
+
+						var outR = param.centerSize + param.radius * generation - param.padding / 2;
+						var inR = param.centerSize + param.radius * (generation - 1) + param.padding / 2;
+						var startA = Math.PI - (2 * Math.PI - param.angle) / 2 - param.angle * i / l;
+						var endA = Math.PI - (2 * Math.PI - param.angle) / 2 - param.angle * (i + 1) / l;
+
+						//startA += -param.padding*Math.PI/180/5.5;
+						//endA += +param.padding*Math.PI/180/5.5;
+
+						var arc = d3.svg.arc()//
+						.innerRadius(inR)//
+						.outerRadius(outR)//
+						.startAngle(startA)//
+						.endAngle(endA);
+
+						var xShift = 0;//generation * param.padding * Math.cos((startA + endA) / 2 - Math.PI / 2);
+						var yShift = 0;//generation * param.padding * Math.sin((startA + endA) / 2 - Math.PI / 2);
+
+						var elem = vis.append("svg:path")//
+						.attr("d", arc)//
+						.attr("transform", "translate(" + xShift + "," + yShift + ")").attr("fill", function() {
+							if(i % 2 == 0) {
+								return d3.rgb(param.colors[generation%param.colors.length][0], param.colors[generation%param.colors.length][1], param.colors[generation%param.colors.length][2]);
+							} else {
+								return d3.rgb(Math.min(param.colors[generation%param.colors.length][0] * param.factor, 255), Math.min(param.colors[generation%param.colors.length][1] * param.factor, 255), Math.min(param.colors[generation%param.colors.length][2] * param.factor, 255));
+							}
+						}).style("stroke-width", param.padding*2)//
+						.style("stroke", "#333")//
+						.attr("class", "arc " + generation + " branch" + i)//
+						.attr("id", (Math.pow(2, generation) + i));
+
+						var text = vis.append("g")//
+						.attr("class", "text")//
+						.style("fill", "black");
+
+						var maximumAngularSpace = param.angle / (Math.pow(2, generation));
+						var spaceLength = maximumAngularSpace * (param.centerSize + param.radius * (generation - 0.5));
+						var maxLetter = spaceLength * 2 / param.fnameFontSize;
+						var name = data.ancestors[generation - 1][i].name;
+						var fname = data.ancestors[generation - 1][i].fname;
+
+						text.append("text")//
+						.style("font-size", param.nameFontSize + "px")//
+						.style("font-weight", "bold")//
+						.attr("dx", outR * param.angle / (param.navigator * l))//just half of the dx attribute is taken into account when text-anchor middle is used on firefox, works properly on chrome
+						.attr("dy", param.radius * 0.4)//
+						.attr("method", "stretch")//
+						.attr("spacing", "auto")//
+						.append("textPath")//
+						.attr("xlink:href", "#" + (Math.pow(2, generation) + i))//
+						.attr("text-anchor", "middle")//
+						.text(name.substring(0, Math.min(maxLetter + 1, name.length + 1)));
+
+						text.append("text")//
+						.style("font-size", param.fnameFontSize + "px")//
+						.attr("dx", outR * param.angle / (param.navigator * l))//just half of the dx attribute is taken into account when text-anchor middle is used on firefox, works properly on chrome
+						.attr("dy", param.radius * 0.8)//
+						.attr("method", "stretch")//
+						.attr("spacing", "auto")//
+						.append("textPath")//
+						.attr("xlink:href", "#" + (Math.pow(2, generation) + i))//
+						.attr("text-anchor", "middle")//
+						.text(fname.substring(0, Math.min(maxLetter + 1, fname.length + 1)));
+					}
+				} else {
+					for(var i = 0; i < l; i++) {
+						var outR = param.centerSize + param.radius * (param.expandStart - 1) + param.radiusRadial * (generation - (param.expandStart - 1)) - param.padding / 2;
+						var inR = param.centerSize + param.radius * (param.expandStart - 1) + param.radiusRadial * (generation - param.expandStart) + param.padding / 2;
+						var startA = Math.PI - (2 * Math.PI - param.angle) / 2 - param.angle * i / l;
+						var endA = Math.PI - (2 * Math.PI - param.angle) / 2 - param.angle * (i + 1) / l;
+
+						var xShift = 0;//generation * param.padding * Math.cos((startA + endA) / 2 - Math.PI / 2);
+						var yShift = 0;//generation * param.padding * Math.sin((startA + endA) / 2 - Math.PI / 2);
+
+						var arc = d3.svg.arc()//
+						.innerRadius(inR)//
+						.outerRadius(outR)//
+						.startAngle(startA)//
+						.endAngle(endA);
+
+						var elem = vis.append("svg:path")//
+						.attr("d", arc)//
+						.attr("transform", "translate(" + xShift + "," + yShift + ")").attr("fill", function() {
+							if(i % 2 == 0) {
+								return d3.rgb(param.colors[generation%param.colors.length][0], param.colors[generation%param.colors.length][1], param.colors[generation%param.colors.length][2]);
+							} else {
+								return d3.rgb(Math.min(param.colors[generation%param.colors.length][0] * param.factor, 255), Math.min(param.colors[generation%param.colors.length][1] * param.factor, 255), Math.min(param.colors[generation%param.colors.length][2] * param.factor, 255));
+							}
+						}).style("stroke-width", param.padding*2)//
+						.style("stroke", "#333")//
+						.attr("class", "arc " + generation + " branch" + i)//
+						.attr("id", (Math.pow(2, generation) + i));
+
+						var text = vis.append("g")//
+						.attr("class", "text")//
+						.style("fill", "black");
+						
+						if(!data.ancestors[generation - 1][i]) continue;
+    
+						var maxLetter = (outR - inR) * 1.5 / param.fnameFontSize;
+						var name = data.ancestors[generation - 1][i].name;
+						var fname = data.ancestors[generation - 1][i].fname;
+
+						if(generation < param.oneLineNameStart) {
+							var x = (inR + 5) * Math.cos((endA + startA) / 2 - 0.01 - Math.PI / 2) + xShift;
+							var y = (inR + 5) * Math.sin((endA + startA) / 2 - 0.01 - Math.PI / 2) + yShift;
+
+							text.append("text")//
+							.style("font-size", param.nameFontSize + "px")//
+							.style("font-weight", "bold")//
+							.attr("transform", "translate(" + x + "," + y + ") rotate(" + ((endA + startA) / 2 - 0.01 - Math.PI / 2) * 180 / (Math.PI) + " 0 0)")//
+							.text(name.substring(0, Math.min(maxLetter + 1, name.length + 1)));
+
+							var xx = (inR + 5) * Math.cos((endA + startA) / 2 + 0.03 - Math.PI / 2) + xShift;
+							var yy = (inR + 5) * Math.sin((endA + startA) / 2 + 0.03 - Math.PI / 2) + yShift;
+
+							text.append("text")//
+							.style("font-size", param.fnameFontSize + "px")//
+							.attr("transform", "translate(" + xx + "," + yy + ") rotate(" + ((endA + startA) / 2 + 0.03 - Math.PI / 2) * 180 / (Math.PI) + " 0 0)")//
+							.text(fname.substring(0, Math.min(maxLetter + 1, fname.length + 1)));
+
+						} else if(generation < param.stopDisplayName) {
+							var x = (inR + 5) * Math.cos((endA + startA) / 2 + 0.01 - Math.PI / 2) + xShift;
+							var y = (inR + 5) * Math.sin((endA + startA) / 2 + 0.01 - Math.PI / 2) + yShift;
+							var toWrite = name + " " + fname;
+
+							text.append("text")//
+							.style("font-size", param.fnameFontSize + "px")//
+							.attr("transform", "translate(" + x + "," + y + ") rotate(" + ((endA + startA) / 2 - 0.01 - Math.PI / 2) * 180 / (Math.PI) + " 0 0)")//
+							.text(toWrite.substring(0, Math.min(maxLetter + 1, toWrite.length + 1)));
+						}
+					}
+					/*vis.selectAll(".arc")//
+					 .on('mouseover', function(d, i) {
+					 d3.select(this).classed('hover', true);
+					 }).on('mouseout', function(d, i) {
+					 d3.select(this).classed('hover', false);
+					 });*/
+				}
+
+			}
+
+			var svg_xml = (new XMLSerializer()).serializeToString(document.getElementById("svg"));
+
+			//display source code
+			$("#code").text(svg_xml);
+
+			var mouseX;
+			var mouseY;
+			$(document).mousemove(function(e) {
+				mouseX = e.pageX+15;
+				mouseY = e.pageY+5;
+				$("#details").css("top", mouseY + "px").css("left", mouseX + "px");
+			});
+
+			$("g.text").hover(function() {
+				$(this).prev().svg().addClass("hover");
+				writeDetails($(this), true);
+				$("#details").css("display", "block");
+			}, function() {
+				$(this).prev().svg().removeClass("hover");
+				$("#details").css("display", "none");
+			});
+			$(".arc").hover(function() {
+				//console.log($(this).attr('id'));
+				writeDetails($(this), false);
+				$("#details").css("display", "block");
+			}, function() {
+				$("#details").css("display", "none");
+			});
+
+			function writeDetails(dom, svg) {
+				var details = {};
+				if (svg){
+					var nDom = dom.prev().svg();
+					details.sosa = nDom.attr('id');
+					details.generation = nDom.attr('class').split(" ")[1];
+					details.branch = nDom.attr('class').split(" ")[2].substring(6,nDom.attr('class').split(" ")[2].length);
+				} else {
+					details.sosa = dom.attr('id');
+					details.generation = dom.attr('class').split(" ")[1];
+					details.branch = dom.attr('class').split(" ")[2].substring(6,dom.attr('class').split(" ")[2].length);
+				}
+				details.brothers = "";
+				for (var i = 0; i < data.ancestors[details.generation - 1][details.branch].brothers; i++){
+					details.brothers += "&#8226";
+				}
+				details.name = data.ancestors[details.generation - 1][details.branch].name;
+				details.fname = data.ancestors[details.generation - 1][details.branch].fname;
+				details.birthDate = data.ancestors[details.generation - 1][details.branch].birth.date;
+				details.birthPlace = data.ancestors[details.generation - 1][details.branch].birth.place;
+				details.deathDate = data.ancestors[details.generation - 1][details.branch].death.date;
+				details.deathPlace = data.ancestors[details.generation - 1][details.branch].death.place;
+				details.mariageDate = data.ancestors[details.generation - 1][details.branch].mariage.date;
+				details.mariagePlace = data.ancestors[details.generation - 1][details.branch].mariage.place;
+				$("#details").html("<strong>"+details.name + "</strong> " + details.fname + "<br />" + details.brothers+ "<br/>Sosa : " + details.sosa + "<br /><br />Né à " + details.birthPlace + " le " + details.birthDate + "<br />Mort à " + details.deathPlace + " le " + details.deathDate + "<br />Marié à " + details.mariagePlace + " le " + details.mariageDate);
+			}
+			
+			function log2int(nb){
+				return Math.ceil(Math.log(nb)/Math.log(2))-1;
+			}
+
+		</script>
+
+		<!-- JavaScript at the bottom for fast page loading: http://developer.yahoo.com/performance/rules.html#js_bottom -->
+
+		<!-- scripts concatenated and minified via build script -->
+		<script src="js/plugins.js"></script>
+		<script src="js/main.js"></script>
+		<!-- end scripts -->
+
+		<!-- Asynchronous Google Analytics snippet. Change UA-XXXXX-X to be your site's ID.
+		mathiasbynens.be/notes/async-analytics-snippet -->
+		<!--<script>
+		var _gaq = [['_setAccount', 'UA-XXXXX-X'], ['_trackPageview']];
+		( function(d, t) {
+		var g = d.createElement(t), s = d.getElementsByTagName(t)[0];
+		g.src = ('https:' == location.protocol ? '//ssl' : '//www') + '.google-analytics.com/ga.js';
+		s.parentNode.insertBefore(g, s)
+		}(document, 'script'));
+		</script>-->
+	</body>
+</html>

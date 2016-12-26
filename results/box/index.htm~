@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>SfM model viewer - V3D - Drawer</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				font-family: Monospace;
+				background-color: #000;
+				color: #fff;
+				margin: 0px;
+				overflow: hidden;
+			}
+			#stats { position: absolute; bottom:0; left: 0 }
+			#stats #fps { background: transparent !important }
+			#stats #fps #fpsText { color: #aaa !important }
+			#stats #fps #fpsGraph { display: none }
+            #progressbar {position: relative; width: 50%; }
+		</style>
+	</head>
+	<body>
+        <script src="../js/three.js" type='text/javascript'></script>
+		<script src="../js/three.src/loaders/ctm/CTMLoader.js" type='text/javascript'></script>
+		<script src="../js/three.src/Detector.js" type='text/javascript'></script>
+		<script src="../js/three.src/controls/TrackballControls.js" type='text/javascript'></script>
+		<script src="../js/three.src/libs/stats.min.js" type='text/javascript'></script>
+        <script src='../js/dat.gui.min.js' type='text/javascript'></script>
+		<!--<script src="js/three.min.js"></script>
+		<script src="V3D.min.js"></script> -->
+
+		<script src="../js/V3DCamTxtLoader.js"></script>
+		<script src="../js/V3DLoaderUtils.js"></script>
+		<script src="../js/SfMView.js"></script>
+		<script src="../js/SfMCamera.js"></script>
+		<script src="../js/SfMCameraHelper.js"></script>
+		<script src="../js/GeneralIntrinsicCamera.js"></script>
+		<script src="../js/MathExtends.js"></script>
+		<script src="../js/threex.domevent.js"></script>
+		<script src="../js/threex.domevent.object3d.js"></script>
+		<!--<script src="ShaderLoader.js"></script>
+		<script src="TextureProject.js"></script> -->
+
+		<script>
+			if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
+
+			var container, stats;
+
+			var scene, meshes = [], renderer;
+            var camera, camera_fly, controls = null, sfmCameras = [];
+			var params = {camera_selected:"", showSfMCameras:true, showCamerasCones:false, meshes:[]};
+            
+            var clock = new THREE.Clock();
+            
+            document.body.appendChild( THREE.V3DLoader.loadingPage() );
+			var loadScene = THREE.V3DLoader.initStandardLoadingScene();
+
+			// LOADERS
+            var V3DLoader = new THREE.V3DLoader();
+            V3DLoader.manager.onProgress = THREE.V3DLoader.defaultProgressFunction;
+            V3DLoader.loadFileNames("filelist"); // SFM View filename list
+            V3DLoader.loadCalibDb("calibration_db.txt"); // SFM View intrinsic calibrations
+            cameras = [ ["G0-aligned-cams.txt", "Floor" ],
+                        ["G1-aligned-cams.txt", "Box" ],
+                        ]; // SFM Camera Extrinsics (one camera can be registered multiple time, hence the reference object name. Use one single file if this is unnecessary.)
+            meshes = [ ["G0_inGlobal_tvFluxModelVolumeWeight_s0.005.ctm", 0x0000ff, "Floor" ], 
+                       ["G1_T0_in_G0-tvFluxModelVolumeWeight_s0.005.ctm", 0x00ff00, "Box" ],
+                          ];// Meshes and - optionally - default color. Use one single file if this is unnecessary.)
+			for (var i = 0 ; i < cameras.length ; ++i )
+                V3DLoader.loadExtrinsics( cameras[ i ] );
+            for (var i = 0 ; i < meshes.length ; ++i )
+                V3DLoader.loadMesh( meshes[ i ] );
+
+            // Optional : observed relative position of meshes
+            V3DLoader.loadRelativeObservations("relative_poses_Txt.txt",{1:"Floor",0:"Box"}); 
+
+            // Optional : articulation parameters between meshes
+            //V3DLoader.loadArticulations("relative_poses_Txt.txt",{0:"Base",1:"Drawer"}); 
+
+            // Optional : set the initial "static" object
+            V3DLoader.setInitialCameraBase("Floor"); 
+
+            // When all files are loaded, replace loading scene with real one
+            V3DLoader.onAllLoaded = function() {
+
+                THREE.V3DLoader.cleanUpLoadingPage();
+                THREE.V3DLoader.cleanUpLoadingScene(loadScene);
+                scene = V3DLoader.scene;
+
+                finalizeScene(scene);
+                THREE.V3DLoader.initDefaultGUI();// Build default GUI for change mesh color, transparency, ...
+                scene.getObjectByName("Floor|Mesh",true).material.opacity = 0.5;
+                scene.getObjectByName("Floor|Mesh",true).material.transparent = true;
+                //initProjector();
+            }
+
+            function finalizeScene(scene) {
+                // Flythrough Camera
+				camera_fly = new THREE.PerspectiveCamera( 20, window.innerWidth / window.innerHeight, 1, 2000 );
+				camera_fly.position.set( 40, 180, -510 ); // Camera initial position
+				camera_fly.up.set( -1, -0.2, 0.1 ); // Camera initial up vector
+                camera=camera_fly;
+
+                // Controls
+                controls = new THREE.TrackballControls( camera_fly, container );
+				controls.rotateSpeed = 1.0;
+				controls.zoomSpeed = 5;
+				controls.panSpeed = 1;
+				controls.noZoom = false;
+				controls.noPan = false;
+				controls.staticMoving = true;
+				controls.dynamicDampingFactor = 50;
+				controls.keys = [ 65, 83, 68 ];
+				controls.addEventListener( 'change', render );
+                controls.target.set( -34, -9, -7); // Camera initial lookAt vector
+
+				// LIGHTS
+				var ambient = new THREE.AmbientLight( 0x404040 );
+				scene.add( ambient );
+
+				spotLight = new THREE.SpotLight( 0xffffff, 1.2, 650, Math.PI/2, 3 );
+				spotLight.position.set( 0, 100, -500 );
+				spotLight.castShadow = true;
+                spotLight.intensity = 1;
+				spotLight.shadowMapWidth = 2048;
+				spotLight.shadowMapHeight = 2048;
+				spotLight.shadowCameraFov = 45;
+				//spotLight.shadowCameraVisible = true;// Uncomment to see where the spotlight is
+				scene.add( spotLight );
+                
+                for (var i = 0 ; i < meshes.length ; ++i )
+                    scene.getObjectByName(meshes[ i ][ 2 ],true).add(new THREE.AxisHelper(800)); // 800 is the axis size
+                
+                clock = new THREE.Clock();
+			    //Animations
+			    animate = function animate() {
+				    requestAnimationFrameID = requestAnimationFrame( animate );
+				    controls.update();
+                    for (f in animate.funcs)
+                        animate.funcs[f]();
+                    render();
+				    stats.update();
+			    }
+                animate();
+                if (THREE && THREE.Object3D && THREE.Object3D._threexDomEvent )
+                    THREE.Object3D._threexDomEvent.camera(camera)
+			}
+            function showSfMCameras(visible) {
+                visible = (visible !== undefined)? visible : true;
+                scene.traverse( function (obj){
+                    if (!(obj instanceof THREE.SfMCamera)) return;
+                        obj.traverse( function (o) {o.visible = visible;});
+                });
+                render();
+            }
+
+			function onWindowResize( event ) {
+                camera_fly.aspect = window.innerWidth / window.innerHeight;
+				camera_fly.updateProjectionMatrix();
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				if (controls) controls.handleResize();
+				render();
+			}
+
+			function render() {
+				renderer.render( scene, camera );
+				stats.update();
+
+			}
+
+			
+		</script>
+
+	</body>
+</html>
+

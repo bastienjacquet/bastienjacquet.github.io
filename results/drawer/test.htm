@@ -1,0 +1,205 @@
+<html>
+<body>
+
+<script src="js/three.js"></script>
+
+<script id="vertexShader" type="x-shader/x-vertex">
+	varying vec3 vViewPosition;
+	varying vec3 vNormal;
+	varying vec2 vUv;
+	uniform vec4 offsetRepeat;
+	varying vec3 vWorldPosition;
+
+	uniform mat4 textureMatrixProj[24]; // for projective texturing
+	varying vec4 texCoordProj[24]; // for projective texturing
+
+	void main() {
+		vUv = uv * offsetRepeat.zw + offsetRepeat.xy;
+
+		vec3 transformedNormal = normalMatrix * normal;
+		vNormal = normalize( transformedNormal );
+
+		vec4 mvPosition;
+		mvPosition = modelViewMatrix * vec4( position, 1.0 );
+		gl_Position = projectionMatrix * mvPosition;
+
+		vViewPosition = -mvPosition.xyz;
+
+		vec4 worldPosition = modelMatrix * vec4( position, 1.0 );
+		vWorldPosition = worldPosition.xyz;
+
+		for ( int i = 0; i < 24; i ++ ) {
+		    texCoordProj[i] = textureMatrixProj[i] * modelMatrix * vec4(position, 1.0);  // for projective texturing
+	    }
+	} 
+</script>
+
+<script id="fragmentShader" type="x-shader/x-fragment">
+	uniform float opacity;
+	const vec3 ambient = vec3(1.0, 1.0, 1.0);
+	
+	varying vec2 vUv;
+	uniform sampler2D map;
+	const vec3 ambientLightColor = vec3(0.5, 0.5, 0.5);
+
+	varying vec3 vWorldPosition;
+	varying vec3 vViewPosition;
+	varying vec3 vNormal;
+
+	uniform sampler2D mapProj[24];  // for projective texturing
+	varying vec4 texCoordProj[24]; // for projective texturing
+
+	void main() {
+		gl_FragColor = vec4( vec3 ( 1.0 ), opacity );
+
+		vec4 texelColor = texture2D( map, vUv );
+
+		gl_FragColor = gl_FragColor * texelColor;
+		
+		for ( int i = 0; i < 24; i ++ ) {
+            vec4 texColorProj = texCoordProj[i].q < 0.0 ? vec4(0.0, 0.0, 0.0, 0.0) : texture2DProj( mapProj[i], texCoordProj[i]); // for projective texturing
+            gl_FragColor.xyz += 1.0/24.0 * texColorProj.xyz ;
+        }
+	}
+</script>
+
+<script>
+
+	//
+	// Using Projective texturing to modulate spot lights by Popov
+	//
+	// brick textures from here: http://www.graphictivitis.com/index.php/25-amazing-brick-textures/ 
+	// vendetta logo from here: http://www.seeklogo.com/v-for-vendetta-logo-146928.html
+
+	var camera, scene, renderer, light;
+	var uniforms, mesh;
+
+	var moveLightTarget = false, rotateCube = true;
+
+	init();
+	animate();
+
+	function init() {
+
+		camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 1, 10000 );
+		camera.position.z = 1000;
+        
+        camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 1, 10000 );
+		camera.position.z = 1000;
+
+		scene = new THREE.Scene();
+
+		light = new THREE.SpotLight( 0xffffff, 3.0, 0.0, false );
+		light.position.set( 0, 300, 1000 );
+		light.target.position.set(0, 0, 0);
+		light.angle = Math.PI/10;
+		light.exponent = 50;
+		scene.add( light );
+
+		scene.updateMatrixWorld();
+
+		var texture = THREE.ImageUtils.loadTexture( "mini/DSC02843.JPG"/*"texture/grasslight-big.jpg"*/ );
+		var textureProj = THREE.ImageUtils.loadTexture( "DSC02843.JPG" );
+
+		var projMatrices = [];
+		var textureProjs = [];
+		for (var i = 0; i< 24; ++i )
+	        projMatrices.push(makeProjectiveMatrixFromCamera(camera));
+		    textureProj.push(sfmcamera.texture);
+		var shader = THREE.ShaderLib[ "phong" ];
+
+		uniforms = THREE.UniformsUtils.clone( shader.uniforms);
+		uniforms[ "map" ].value = texture;
+		uniforms[ "specular" ].value = new THREE.Color(0x808080);
+		uniforms[ "shininess" ].value = 2000;
+		
+		uniforms[ "mapProj"] = {
+			"type": "tv", "value": textureProjs
+		};
+		uniforms[ "textureMatrixProj"] = {
+			"type": "m4v", "value": projMatrices
+		};
+
+		var vertexShader = document.getElementById( 'vertexShader' ).textContent;
+		var fragmentShader = document.getElementById( 'fragmentShader' ).textContent;
+
+		var parameters = {
+			fragmentShader: fragmentShader,
+			vertexShader: vertexShader,
+			uniforms: uniforms,
+			lights: true
+		};
+
+		mesh = new THREE.Mesh( new THREE.CubeGeometry( 1000,600,600, 1, 1, 1 ), new THREE.ShaderMaterial( parameters ) );
+
+		scene.add( mesh );
+
+		renderer = new THREE.WebGLRenderer();
+		renderer.setSize( window.innerWidth, window.innerHeight );
+
+		document.body.appendChild( renderer.domElement );
+
+		animate.angle = 0.0;
+	}
+
+	function makeProjectiveMatrixForLight(l) {
+		var lightCamera = new THREE.PerspectiveCamera( 2*l.angle*180/Math.PI, 1.0, 1, 1000 );
+		var lightMatrix = new THREE.Matrix4();
+		var targetPosition = new THREE.Vector3();
+
+		lightCamera.position.getPositionFromMatrix( l.matrixWorld );
+		targetPosition.getPositionFromMatrix( l.target.matrixWorld );
+		lightCamera.lookAt( targetPosition );
+		lightCamera.updateMatrixWorld();
+
+		lightCamera.matrixWorldInverse.getInverse( lightCamera.matrixWorld );
+
+		lightMatrix.set( 0.5, 0.0, 0.0, 0.5,
+						  0.0, 0.5, 0.0, 0.5,
+						  0.0, 0.0, 0.5, 0.5,
+						  0.0, 0.0, 0.0, 1.0 );
+
+		lightMatrix.multiply( lightCamera.projectionMatrix );
+		lightMatrix.multiply( lightCamera.matrixWorldInverse );
+
+		return lightMatrix;
+	}
+
+	function makeProjectiveMatrixFromCamera(c) {
+        var unprojMatrix = new THREE.Matrix4().set( 0.5, 0.0, 0.0, 0.5,
+						  0.0, 0.5, 0.0, 0.5,
+						  0.0, 0.0, 0.5, 0.5,
+						  0.0, 0.0, 0.0, 1.0 );
+		var lightCamera = c.clone();
+	    //c.updateMatrixWorld();
+		c.matrixWorldInverse.getInverse( c.matrixWorld );
+		unprojMatrix.multiply( c.projectionMatrix );
+		unprojMatrix.multiply( c.matrixWorldInverse );
+
+		return unprojMatrix;
+	}
+	function animate() {
+
+		requestAnimationFrame( animate );
+
+		if (moveLightTarget) {
+			animate.angle += 0.01;
+			light.target.position.x = 250*Math.cos(animate.angle);
+			light.target.position.y = 100*Math.sin(animate.angle);
+
+			uniforms.textureMatrixProj.value = makeProjectiveMatrixForLight(light);
+		}
+
+		if (rotateCube) {
+			mesh.rotation.y += 0.003;
+			mesh.rotation.x += 0.004;
+		}
+
+		renderer.render( scene, camera );
+
+	}
+
+</script>
+
+</body>
+</html>
